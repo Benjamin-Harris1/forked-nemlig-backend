@@ -25,7 +25,10 @@ async function getCustomerIdFromUserEmail(userEmail) {
 async function getFavoritesFromDB(userEmail, category, sort, label) {
   const customerId = await getCustomerIdFromUserEmail(userEmail); // UserID should also be passed in the request body instead of customerId, since we convert it here
   // Define the where clause for the Prisma query
-  let where = { customer_id: customerId };
+  let where = { customer_id: customerId,
+  products: {
+    deleted: false,
+  } };
   // If a category is passed in the request query, add it to the where clause
   if (category) {
     where.products = {
@@ -118,7 +121,10 @@ async function deleteFavoriteFromDB(favoriteId) {
 async function searchFavoritesFromDB(userEmail, search, category, sort, label) {
   const customerId = await getCustomerIdFromUserEmail(userEmail);
   // Define the where clause for the Prisma query
-  let where = { customer_id: customerId };
+  let where = { customer_id: customerId,
+  products: {
+    deleted: false,
+  } };
   // If a category is passed in the request query, add it to the where clause
   if (category) {
     where.products = {

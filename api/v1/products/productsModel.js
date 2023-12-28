@@ -25,7 +25,7 @@ async function getCustomerIdFromUserEmail(userEmail) {
 async function getProductsFromDB(category, sort, label, userEmail) {
   // Define the where and orderBy clause for the Prisma query
   let orderBy = {};
-  let where = {};
+  let where = { deleted: false};
   let customerId;
 
   // Get the customer_id from the user_email only if userEmail is defined
@@ -96,7 +96,7 @@ async function getProductsFromDB(category, sort, label, userEmail) {
 
 async function getProductByIdFromDB(productId) {
   return await prisma.product.findUnique({
-    where: { product_id: productId },
+    where: { product_id: productId, deleted: false },
     include: {
       images: true,
       labels: true,
@@ -262,22 +262,17 @@ async function updateProductInDB(productId, productData) {
 }
 
 async function deleteProductFromDB(productId) {
-  // DELETE RELATIONS ON JUNCTION TABLES - USING RAW SQL, AS WE CANT ADD CASCADING DELETES ON MANY-TO-MANY IMPLICIT RELATION TABLES
-  await prisma.$queryRaw`DELETE FROM _CategoryToProduct WHERE B = ${productId};`;
-  await prisma.$queryRaw`DELETE FROM _LabelToProduct WHERE B = ${productId};`;
-  await prisma.$queryRaw`DELETE FROM Productimage WHERE product_id = ${productId};`;
-  await prisma.$queryRaw`DELETE FROM Inventory WHERE product_id = ${productId};`;
-  await prisma.$queryRaw`DELETE FROM Price WHERE product_id = ${productId};`;
-  await prisma.$queryRaw`DELETE FROM Order_item WHERE product_id = ${productId};`;
-
-  // DELETE PRODUCT
-  await prisma.product.delete({ where: { product_id: productId } });
+  // UPDATE PRODUCT AS DELETED
+  await prisma.product.update({ 
+  where: { product_id: productId },
+  data: {deleted: true} 
+});
 }
 
 // SEARCH FUNCTIONALITY
 async function searchProductsFromDB(search, category, sort, label, userEmail) {
   // Define the where clause for the Prisma query
-  let where = {};
+  let where = { deleted: false };
   let products;
   let customerId;
 
@@ -303,40 +298,23 @@ async function searchProductsFromDB(search, category, sort, label, userEmail) {
     };
   }
   // Fetch the products from the DB based on the where clause
-  if (category || label) {
-    products = await prisma.product.findMany({
-      where,
-      include: {
-        images: true,
-        labels: true,
-        categories: true,
-        inventory: true,
-        prices: {
-          where: {
-            ending_at: {
-              gt: new Date(),
-            },
+  // Always include the where clause
+  products = await prisma.product.findMany({
+    where,
+    include: {
+      images: true,
+      labels: true,
+      categories: true,
+      inventory: true,
+      prices: {
+        where: {
+          ending_at: {
+            gt: new Date(),
           },
         },
       },
-    });
-  } else {
-    products = await prisma.product.findMany({
-      include: {
-        images: true,
-        labels: true,
-        categories: true,
-        inventory: true,
-        prices: {
-          where: {
-            ending_at: {
-              gt: new Date(),
-            },
-          },
-        },
-      },
-    });
-  }
+    },
+  });
 
   if (customerId) {
     // Fetch all favorites for the current user
